@@ -2,7 +2,7 @@ import os
 import sys
 import math
 import gc
-import re  # Add this import for regex pattern matching
+import re
 from PIL import Image, ImageOps
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
@@ -21,7 +21,7 @@ class PSDCreatorApp:
         self.RIGHT_MARGIN_CM = 1
         self.BOTTOM_MARGIN_CM = 1
         self.HORIZONTAL_SPACING_CM = 3
-        self.STROKE_HORIZONTAL_SPACING_CM = 3  # Default same as regular spacing
+        self.STROKE_HORIZONTAL_SPACING_CM = 3
         self.VERTICAL_SPACING_CM = 2.5
         self.DPI = 120
         
@@ -55,12 +55,12 @@ class PSDCreatorApp:
         
         # Target width input
         ttk.Label(selection_frame, text="Target Image Width (cm):").grid(column=0, row=4, sticky=tk.W, pady=5)
-        self.target_width_var = tk.StringVar(value="10")  # Default value
+        self.target_width_var = tk.StringVar(value="10")
         ttk.Entry(selection_frame, textvariable=self.target_width_var, width=10).grid(column=0, row=5, sticky=tk.W, pady=5)
         
         # Stroke target width input
         ttk.Label(selection_frame, text="Stroke Target Image Width (cm):").grid(column=0, row=6, sticky=tk.W, pady=5)
-        self.stroke_target_width_var = tk.StringVar(value="10")  # Default value
+        self.stroke_target_width_var = tk.StringVar(value="10")
         ttk.Entry(selection_frame, textvariable=self.stroke_target_width_var, width=10).grid(column=0, row=7, sticky=tk.W, pady=5)
         
         # Settings frame
@@ -187,11 +187,10 @@ class PSDCreatorApp:
         new_size = (image.width + 2*stroke_width, image.height + 2*stroke_width)
         stroke_img = Image.new('RGBA', new_size, (0, 0, 0, 0))
         
-        # For each direction (up, down, left, right and diagonals), 
-        # create a shifted version of the alpha channel
+        # For each direction (up, down, left, right and diagonals)
         directions = [
-            (0, -1), (0, 1), (-1, 0), (1, 0),  # Cardinal directions
-            (-1, -1), (-1, 1), (1, -1), (1, 1)  # Diagonal directions
+            (0, -1), (0, 1), (-1, 0), (1, 0),
+            (-1, -1), (-1, 1), (1, -1), (1, 1)
         ]
         
         # Create a new alpha channel for the stroke
@@ -199,17 +198,12 @@ class PSDCreatorApp:
         
         # For each direction, shift the alpha channel and merge it
         for dx, dy in directions:
-            # Create a shifted alpha channel
             shifted_alpha = Image.new('L', new_size, 0)
             shifted_alpha.paste(alpha, (stroke_width + dx, stroke_width + dy))
-            
-            # Merge with the stroke alpha (taking maximum value at each pixel)
             stroke_data = list(stroke_alpha.getdata())
             shifted_data = list(shifted_alpha.getdata())
             merged_data = [max(a, b) for a, b in zip(stroke_data, shifted_data)]
             stroke_alpha.putdata(merged_data)
-            
-            # Clean up to save memory
             shifted_alpha = None
         
         # Create black stroke image with the stroke alpha
@@ -224,7 +218,7 @@ class PSDCreatorApp:
         original_position_mask = Image.new('L', new_size, 0)
         original_position_mask.paste(alpha, (stroke_width, stroke_width))
         
-        # Invert the mask - white where original image isn't, black where it is
+        # Invert the mask
         inverted_mask_data = [255 - p for p in list(original_position_mask.getdata())]
         inverted_mask = Image.new('L', new_size, 0)
         inverted_mask.putdata(inverted_mask_data)
@@ -233,7 +227,6 @@ class PSDCreatorApp:
         stroke_rgba = list(stroke_layer.convert('RGBA').getdata())
         inverted_mask_data = list(inverted_mask.getdata())
         
-        # Set alpha to 0 where the original image is (using the inverted mask)
         new_stroke_data = []
         for i, (r, g, b, a) in enumerate(stroke_rgba):
             mask_value = inverted_mask_data[i]
@@ -245,7 +238,7 @@ class PSDCreatorApp:
         # Combine the stroke and the original image
         result = Image.alpha_composite(stroke_layer, result)
         
-        # Clean up to save memory
+        # Clean up
         stroke_alpha = None
         stroke_layer = None
         original_position_mask = None
@@ -255,31 +248,25 @@ class PSDCreatorApp:
     
     def validate_inputs(self):
         """Validate user inputs before processing."""
-        # Check input folder
         input_folder = self.input_folder_var.get()
         if not input_folder or not os.path.isdir(input_folder):
             messagebox.showerror("Error", "Please select a valid input folder.")
             return False
         
-        # Check if input folder contains PNG files
         png_files = [f for f in os.listdir(input_folder) if f.lower().endswith('.png')]
         if not png_files:
             messagebox.showerror("Error", "Input folder does not contain any PNG files.")
             return False
         
-        # Check output folder
         output_folder = self.output_folder_var.get()
         if not output_folder or not os.path.isdir(output_folder):
             messagebox.showerror("Error", "Please select a valid output folder.")
             return False
         
-        # Validate image width
         try:
             width_cm = float(self.target_width_var.get())
             if width_cm <= 0:
                 raise ValueError("Width must be positive")
-                
-            # Validate stroke image width
             stroke_width_cm = float(self.stroke_target_width_var.get())
             if stroke_width_cm <= 0:
                 raise ValueError("Stroke width must be positive")
@@ -287,7 +274,6 @@ class PSDCreatorApp:
             messagebox.showerror("Error", "Please enter valid positive numbers for the image widths.")
             return False
         
-        # Validate spacing and margin values
         try:
             h_spacing = float(self.h_spacing_var.get())
             stroke_h_spacing = float(self.stroke_h_spacing_var.get())
@@ -303,50 +289,21 @@ class PSDCreatorApp:
             messagebox.showerror("Error", "Please enter valid numbers for spacing and margin values.")
             return False
         
-        # Check if output format and background are compatible
         if self.format_var.get() == "JPG" and self.background_var.get() == "transparent":
             messagebox.showwarning("Warning", "JPG format does not support transparency. Using white background instead.")
             self.background_var.set("white")
         
         return True
     
-    def get_repeat_count(self, filename):
-        """
-        Extract the repeat count from a filename with pattern QT_xxx_filename.png
-        Returns the repeat count (int) or 1 if pattern doesn't match
-        """
-        # Regular expression to match the pattern QT_xxx_ at the beginning of the filename
-        pattern = r'^QT_(\d+)_.*'
-        match = re.match(pattern, filename)
-        
-        if match:
-            try:
-                # Extract the number from the match group
-                repeat_count = int(match.group(1))
-                if repeat_count < 1:
-                    # If the number is less than 1, default to 1
-                    return 1
-                return repeat_count
-            except ValueError:
-                # If conversion to int fails, return 1
-                return 1
-        else:
-            # If pattern doesn't match, return 1 (no repetition)
-            return 1
-    
     def start_processing(self):
-        """Start the image processing."""
+        """Start the image processing with auto width adjustment for ZKT_xxx_ prefixed files."""
         if not self.validate_inputs():
             return
         
-        # Disable the start button during processing
         self.parent.config(cursor="wait")
-        
-        # Explicitly run garbage collection to start with clean memory
         gc.collect()
         
         try:
-            # Set initial progress
             self.progress_var.set(0)
             self.status_var.set("Initializing processing...")
             self.parent.update_idletasks()
@@ -369,8 +326,6 @@ class PSDCreatorApp:
             self.BOTTOM_MARGIN_CM = float(self.bottom_margin_var.get())
             
             # Convert to pixels
-            target_width_px = self.cm_to_pixels(target_width_cm)
-            stroke_target_width_px = self.cm_to_pixels(stroke_target_width_cm)
             left_margin_px = self.cm_to_pixels(self.LEFT_MARGIN_CM)
             top_margin_px = self.cm_to_pixels(self.TOP_MARGIN_CM)
             right_margin_px = self.cm_to_pixels(self.RIGHT_MARGIN_CM)
@@ -382,166 +337,170 @@ class PSDCreatorApp:
             # Get all PNG files
             png_files = [f for f in os.listdir(input_folder) if f.lower().endswith('.png')]
             
-            # Create a processing queue with repeated files as per the pattern
-            processing_queue = []
+            # Calculate total images to process (including repeats)
+            total_images = 0
             for file_name in png_files:
-                repeat_count = self.get_repeat_count(file_name)
-                # Add the file to the queue repeat_count times
-                for _ in range(repeat_count):
-                    processing_queue.append(file_name)
+                match = re.match(r'^QT_(\d+)_', file_name)
+                if match:
+                    repeat_count = int(match.group(1))
+                    total_images += max(1, repeat_count)  # Ensure at least 1
+                else:
+                    total_images += 1
             
-            total_files = len(processing_queue)
-            
-            # Update progress (5% for initialization)
             self.progress_var.set(5)
-            self.status_var.set(f"Found {total_files} PNG files to process (including repetitions)")
+            self.status_var.set(f"Found {len(png_files)} PNG files to process ({total_images} total images)")
             self.parent.update_idletasks()
             
-            # Create a blank canvas with appropriate mode
+            # Create a blank canvas
             if background_type == "transparent" and output_format == "PNG":
-                canvas = Image.new('RGBA', (self.WIDTH_PX, self.HEIGHT_PX), color=(0, 0, 0, 0))  # Transparent
+                canvas = Image.new('RGBA', (self.WIDTH_PX, self.HEIGHT_PX), color=(0, 0, 0, 0))
             else:
-                canvas = Image.new('RGB', (self.WIDTH_PX, self.HEIGHT_PX), color=(255, 255, 255))  # White
+                canvas = Image.new('RGB', (self.WIDTH_PX, self.HEIGHT_PX), color=(255, 255, 255))
             
             # Current position
             x = left_margin_px
             y = top_margin_px
             
-            # Counter for processed images and canvases
+            # Counters
             processed = 0
             canvas_count = 1
             
-            # Calculate the progress increment per file (leave 10% for final saving)
-            file_progress_increment = 85 / total_files if total_files > 0 else 0
-            current_progress = 5  # Starting from 5%
+            # Progress increment per image
+            image_progress_increment = 85 / total_images if total_images > 0 else 0
+            current_progress = 5
             
-            # Process each PNG in the queue (which includes repetitions)
-            for i, file_name in enumerate(processing_queue):
+            # Process each PNG
+            for i, file_name in enumerate(png_files):
                 try:
-                    # Update progress - smooth increment for each step
-                    file_start_progress = current_progress
+                    # Check for QT_xx_ prefix
+                    match = re.match(r'^QT_(\d+)_', file_name)
+                    repeat_count = int(match.group(1)) if match else 1
+                    repeat_count = max(1, repeat_count)  # Ensure at least 1
                     
-                    # Set progress for image loading (25% of the file's progress)
-                    current_progress = file_start_progress + (file_progress_increment * 0.25)
-                    self.progress_var.set(current_progress)
-                    self.status_var.set(f"Loading {file_name} ({i+1}/{total_files})")
-                    self.parent.update_idletasks()
-                    
-                    # Load image
-                    img_path = os.path.join(input_folder, file_name)
-                    img = Image.open(img_path)
-                    
-                    # Convert to RGBA if not already (50% of file's progress)
-                    current_progress = file_start_progress + (file_progress_increment * 0.5)
-                    self.progress_var.set(current_progress)
-                    self.status_var.set(f"Processing {file_name} ({i+1}/{total_files})")
-                    self.parent.update_idletasks()
-                    
-                    if img.mode != 'RGBA':
-                        img = img.convert('RGBA')
-                    
-                    # Check if we need to add a stroke (file starts with "stroke_")
-                    is_stroke_image = file_name.lower().startswith("stroke_")
-                    
-                    # For all images, trim transparent areas
-                    alpha = img.getchannel('A')
-                    bbox = alpha.getbbox()
-                    if bbox:
-                        img = img.crop(bbox)
-                    
-                    # Apply stroke if needed (after cropping)
-                    if is_stroke_image:
-                        self.status_var.set(f"Adding stroke to {file_name}")
+                    for repeat in range(repeat_count):
+                        file_start_progress = current_progress
+                        current_progress = file_start_progress + (image_progress_increment * 0.25)
+                        self.progress_var.set(current_progress)
+                        self.status_var.set(f"Loading {file_name} ({processed+1}/{total_images})")
                         self.parent.update_idletasks()
-                        img = self.add_stroke(img, stroke_width=1)
-                    
-                    # Calculate aspect ratio
-                    aspect_ratio = img.width / img.height
-                    
-                    # Resize to target width (75% of file's progress)
-                    current_progress = file_start_progress + (file_progress_increment * 0.75)
-                    self.progress_var.set(current_progress)
-                    self.parent.update_idletasks()
-                    
-                    # Use different target width for stroke images
-                    if is_stroke_image:
-                        target_height = int(stroke_target_width_px / aspect_ratio)
-                        img = img.resize((stroke_target_width_px, target_height), Image.LANCZOS)
-                    else:
+                        
+                        # Load image
+                        img_path = os.path.join(input_folder, file_name)
+                        img = Image.open(img_path)
+                        
+                        current_progress = file_start_progress + (image_progress_increment * 0.5)
+                        self.progress_var.set(current_progress)
+                        self.status_var.set(f"Processing {file_name} ({processed+1}/{total_images})")
+                        self.parent.update_idletasks()
+                        
+                        if img.mode != 'RGBA':
+                            img = img.convert('RGBA')
+                        
+                        # Check if stroke image
+                        is_stroke_image = file_name.lower().startswith("stroke_")
+                        
+                        # Trim transparent areas
+                        alpha = img.getchannel('A')
+                        bbox = alpha.getbbox()
+                        if bbox:
+                            img = img.crop(bbox)
+                        
+                        # Apply stroke if needed
+                        if is_stroke_image:
+                            self.status_var.set(f"Adding stroke to {file_name}")
+                            self.parent.update_idletasks()
+                            img = self.add_stroke(img, stroke_width=1)
+                        
+                        # Calculate aspect ratio
+                        aspect_ratio = img.width / img.height
+                        
+                        current_progress = file_start_progress + (image_progress_increment * 0.75)
+                        self.progress_var.set(current_progress)
+                        self.parent.update_idletasks()
+                        
+                        # Check for ZKT_xxx_ prefix to auto-adjust width
+                        zkt_match = re.match(r'^ZKT_(\d+)_', file_name)
+                        if zkt_match:
+                            # Extract width from ZKT_xxx_ prefix (in cm)
+                            auto_width_cm = float(zkt_match.group(1))
+                            if auto_width_cm <= 0:
+                                raise ValueError(f"Invalid width {auto_width_cm}cm in filename {file_name}")
+                            target_width_px = self.cm_to_pixels(auto_width_cm)
+                            self.status_var.set(f"Auto-setting width to {auto_width_cm}cm for {file_name}")
+                            self.parent.update_idletasks()
+                        else:
+                            # Use default width based on image type
+                            target_width_px = self.cm_to_pixels(stroke_target_width_cm if is_stroke_image else target_width_cm)
+                        
+                        # Resize image
                         target_height = int(target_width_px / aspect_ratio)
                         img = img.resize((target_width_px, target_height), Image.LANCZOS)
-                    
-                    # Rotate 90 degrees clockwise
-                    img = img.rotate(-90, expand=True)
-                    
-                    # Force garbage collection to free up memory
-                    alpha = None
-                    gc.collect()
-                    
-                    # Check if we need to start a new row
-                    if (x + img.width) > (self.WIDTH_PX - right_margin_px):
-                        x = left_margin_px
-                        # Use the width of the current image type for vertical spacing calculation
-                        current_width_px = stroke_target_width_px if is_stroke_image else target_width_px
-                        y += current_width_px + v_spacing_px
-                    
-                    # Check if we need a new canvas
-                    if (y + img.height) > (self.HEIGHT_PX - bottom_margin_px):
-                        # Update progress - saving canvas (85% of file's progress)
-                        current_progress = file_start_progress + (file_progress_increment * 0.85)
-                        self.progress_var.set(current_progress)
-                        self.status_var.set(f"Saving canvas {canvas_count}")
-                        self.parent.update_idletasks()
                         
-                        # Save current canvas
-                        if output_format == "PNG":
-                            canvas_path = os.path.join(output_folder, f"catalog_{canvas_count}.png")
-                            # Save with transparency if selected
-                            if background_type == "transparent":
-                                canvas.save(canvas_path, format="PNG")
+                        # Rotate 90 degrees clockwise
+                        img = img.rotate(-90, expand=True)
+                        
+                        alpha = None
+                        gc.collect()
+                        
+                        # Check for new row
+                        if (x + img.width) > (self.WIDTH_PX - right_margin_px):
+                            x = left_margin_px
+                            current_width_px = target_width_px
+                            y += current_width_px + v_spacing_px
+                        
+                        # Check for new canvas
+                        if (y + img.height) > (self.HEIGHT_PX - bottom_margin_px):
+                            current_progress = file_start_progress + (image_progress_increment * 0.85)
+                            self.progress_var.set(current_progress)
+                            self.status_var.set(f"Saving canvas {canvas_count}")
+                            self.parent.update_idletasks()
+                            
+                            # Save current canvas
+                            if output_format == "PNG":
+                                canvas_path = os.path.join(output_folder, f"catalog_{canvas_count}.png")
+                                if background_type == "transparent":
+                                    canvas.save(canvas_path, format="PNG")
+                                else:
+                                    canvas.convert('RGB').save(canvas_path, format="PNG")
                             else:
-                                canvas.convert('RGB').save(canvas_path, format="PNG")
-                        else:  # JPG
-                            canvas_path = os.path.join(output_folder, f"catalog_{canvas_count}.jpg")
-                            canvas.convert('RGB').save(canvas_path, quality=95)
+                                canvas_path = os.path.join(output_folder, f"catalog_{canvas_count}.jpg")
+                                canvas.convert('RGB').save(canvas_path, quality=95)
+                            
+                            self.status_var.set(f"Saved canvas {canvas_count} to {canvas_path}")
+                            self.parent.update_idletasks()
+                            
+                            # Create new canvas
+                            if background_type == "transparent" and output_format == "PNG":
+                                canvas = Image.new('RGBA', (self.WIDTH_PX, self.HEIGHT_PX), color=(0, 0, 0, 0))
+                            else:
+                                canvas = Image.new('RGB', (self.WIDTH_PX, self.HEIGHT_PX), color=(255, 255, 255))
+                            
+                            canvas_count += 1
+                            x = left_margin_px
+                            y = top_margin_px
                         
-                        self.status_var.set(f"Saved canvas {canvas_count} to {canvas_path}")
+                        # Paste the image
+                        canvas.paste(img, (x, y), img if img.mode == 'RGBA' else None)
+                        
+                        # Update position
+                        if is_stroke_image:
+                            x += img.width + stroke_h_spacing_px
+                        else:
+                            x += img.width + h_spacing_px
+                        processed += 1
+                        
+                        img = None
+                        gc.collect()
+                        
+                        current_progress = file_start_progress + image_progress_increment
+                        self.progress_var.set(current_progress)
                         self.parent.update_idletasks()
                         
-                        # Create a new canvas with appropriate mode
-                        if background_type == "transparent" and output_format == "PNG":
-                            canvas = Image.new('RGBA', (self.WIDTH_PX, self.HEIGHT_PX), color=(0, 0, 0, 0))  # Transparent
-                        else:
-                            canvas = Image.new('RGB', (self.WIDTH_PX, self.HEIGHT_PX), color=(255, 255, 255))  # White
-                        
-                        canvas_count += 1
-                        x = left_margin_px
-                        y = top_margin_px
-                    
-                    # Paste the image onto the canvas
-                    canvas.paste(img, (x, y), img if img.mode == 'RGBA' else None)
-                    
-                    # Update position for next image - use different spacing for stroke images
-                    if is_stroke_image:
-                        x += img.width + stroke_h_spacing_px
-                    else:
-                        x += img.width + h_spacing_px
-                    processed += 1
-                    
-                    # Free up memory by explicitly removing the image
-                    img = None
-                    gc.collect()
-                    
-                    # Complete this file's progress
-                    current_progress = file_start_progress + file_progress_increment
-                    self.progress_var.set(current_progress)
-                    self.parent.update_idletasks()
-                    
                 except Exception as e:
                     self.status_var.set(f"Error processing {file_name}: {e}")
                     self.parent.update_idletasks()
             
-            # Save the last canvas (moving to 95%)
+            # Save the last canvas
             if processed > 0:
                 self.progress_var.set(95)
                 self.status_var.set(f"Saving final canvas...")
@@ -549,32 +508,28 @@ class PSDCreatorApp:
                 
                 if output_format == "PNG":
                     canvas_path = os.path.join(output_folder, f"catalog_{canvas_count}.png")
-                    # Save with transparency if selected
                     if background_type == "transparent":
                         canvas.save(canvas_path, format="PNG", optimize=True)
                     else:
                         canvas.convert('RGB').save(canvas_path, format="PNG", optimize=True)
-                else:  # JPG
+                else:
                     canvas_path = os.path.join(output_folder, f"catalog_{canvas_count}.jpg")
                     canvas.convert('RGB').save(canvas_path, quality=95, optimize=True)
                 
-                # Clear canvas object and run garbage collection
                 canvas = None
                 gc.collect()
                 
                 self.status_var.set(f"Saved final canvas to {canvas_path}")
             
-            # Update progress to 100% and show completion message
             self.progress_var.set(100)
             self.status_var.set(f"Completed! Created {canvas_count} image files.")
             self.parent.update_idletasks()
             
-            messagebox.showinfo("Success", f"Processing complete! Created {canvas_count} image files with repetitions applied.")
+            messagebox.showinfo("Success", f"Processing complete! Created {canvas_count} image files.")
             
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred during processing: {str(e)}")
             self.status_var.set(f"Error: {str(e)}")
         
         finally:
-            # Re-enable the start button
             self.parent.config(cursor="")
